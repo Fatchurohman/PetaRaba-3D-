@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TactileMap 3D - Generator Peta Raba & Braille Tunanetra</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #0b1329;
+      color: #f8fafc;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #viewport-container {
+      flex: 1;
+      position: relative;
+      background: radial-gradient(circle at center, #1e293b 0%, #090d16 100%);
+    }
+    #canvas3d {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #sidebar {
+      width: 440px;
+      background-color: #111c38;
+      border-left: 1px solid #1e293b;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 24px;
+      gap: 16px;
+    }
+    .header h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #facc15;
+      margin-bottom: 6px;
+    }
+    .dev-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: lowercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      background: rgba(11, 19, 41, 0.7);
+      padding: 4px 10px;
+      border-radius: 9999px;
+      border: 1px solid #1e293b;
+      width: fit-content;
+    }
+    .live-dot-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 8px;
+      height: 8px;
+    }
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background-color: #22c55e;
+      border-radius: 50%;
+    }
+    .live-dot-ping {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background-color: #22c55e;
+      border-radius: 50%;
+      animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+    @keyframes ping {
+      0% { transform: scale(1); opacity: 0.8; }
+      75%, 100% { transform: scale(2.4); opacity: 0; }
+    }
+    .section-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #93c5fd;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+    }
+    .preset-group {
+      display: flex;
+      gap: 6px;
+    }
+    .btn-preset {
+      flex: 1;
+      padding: 8px 4px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .btn-preset:hover {
+      background: #334155;
+      border-color: #facc15;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: #cbd5e1;
+    }
+    .control-label span {
+      color: #facc15;
+      font-weight: 600;
+    }
+    input[type="text"] {
+      background: #0b1329;
+      border: 1px solid #334155;
+      color: #f8fafc;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      outline: none;
+    }
+    input[type="text"]:focus {
+      border-color: #facc15;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: #facc15;
+      cursor: pointer;
+    }
+    /* Grid Editor Denah */
+    .grid-container {
+      background: #0b1329;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .grid-board {
+      display: grid;
+      grid-template-columns: repeat(8, 28px);
+      grid-template-rows: repeat(8, 28px);
+      gap: 3px;
+    }
+    .grid-cell {
+      background: #1e293b;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .grid-cell:hover {
+      background: #334155;
+    }
+    .grid-cell.active-wall {
+      background: #facc15;
+      box-shadow: inset 0 0 4px rgba(0,0,0,0.4);
+    }
+    .grid-cell.active-start {
+      background: #ef4444;
+    }
+    .grid-legend {
+      display: flex;
+      gap: 12px;
+      font-size: 0.72rem;
+      color: #94a3b8;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+    }
+    .metrics-panel {
+      background: #0b1329;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+    }
+    .metric-row .label {
+      color: #94a3b8;
+    }
+    .metric-row .val {
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+    .metric-row .val.highlight {
+      color: #4ade80;
+    }
+    .btn-download {
+      background: #eab308;
+      color: #0b1329;
+      border: none;
+      border-radius: 8px;
+      padding: 13px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.2s;
+      margin-top: auto;
+    }
+    .btn-download:hover {
+      background: #ca8a04;
+    }
+    .instruction-badge {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: rgba(11, 19, 41, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      pointer-events: none;
+    }
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+      #sidebar { width: 100%; height: 55vh; }
+      #viewport-container { height: 45vh; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="viewport-container">
+    <div class="instruction-badge">Kuning = Garis Timbul & Braille | Hitam/Biru Gelap = Pelat Taktil Dasar</div>
+    <canvas id="canvas3d"></canvas>
+  </div>
+
+  <div id="sidebar">
+    <div class="header">
+      <h1>TactileMap 3D</h1>
+      <div class="dev-badge">
+        <span class="live-dot-wrapper">
+          <span class="live-dot-ping"></span>
+          <span class="live-dot"></span>
+        </span>
+        <span>developer : fatur62</span>
+      </div>
+    </div>
+
+    <div class="section-title">1. Teks Braille Otomatis</div>
+    <div class="control-group">
+      <div class="control-label">
+        <label for="input-text">Label Plakat (Maks 14 Karakter)</label>
+        <span id="label-braille-preview">⠞⠕⠊⠇⠑⠞</span>
+      </div>
+      <input type="text" id="input-text" maxlength="14" value="TOILET" placeholder="Ketik label...">
+    </div>
+
+    <div class="preset-group">
+      <button class="btn-preset" data-text="TOILET">Toilet</button>
+      <button class="btn-preset" data-text="KELUAR">Pintu Keluar</button>
+      <button class="btn-preset" data-text="LIFT">Area Lift</button>
+      <button class="btn-preset" data-text="RUANG 1">Ruang 1</button>
+    </div>
+
+    <div class="section-title">2. Editor Denah Raba (Grid 8x8)</div>
+    <div class="grid-container">
+      <div class="grid-board" id="grid-board"></div>
+      <div class="grid-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#facc15"></div> Dinding / Koridor</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div> Anda di Sini</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#1e293b"></div> Lantai Kosong</div>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-label">
+        <label for="input-height">Tinggi Timbul Dinding & Braille</label>
+        <span id="label-height">1.2 mm</span>
+      </div>
+      <input type="range" id="input-height" min="0.8" max="2.0" step="0.1" value="1.2">
+    </div>
+
+    <div class="metrics-panel">
+      <div class="metric-row">
+        <span class="label">Standar Taktil:</span>
+        <span class="val highlight">Baku Internasional</span>
+      </div>
+      <div class="metric-row">
+        <span class="label">Dimensi Plakat:</span>
+        <span class="val" id="metric-dim">110 x 135 mm</span>
+      </div>
+      <div class="metric-row">
+        <span class="label">Estimasi Bobot Cetak:</span>
+        <span class="val" id="metric-weight">42 g</span>
+      </div>
+      <div class="metric-row">
+        <span class="label">Estimasi Jasa Print 3D:</span>
+        <span class="val highlight" id="metric-cost">Rp 21.000</span>
+      </div>
+    </div>
+
+    <button id="btn-export" class="btn-download">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+      Download File STL Taktil
+    </button>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // Peta Matriks 6-Titik Braille Standar (A-Z, 0-9, Spasi)
+      const BRAILLE_MAP = {
+        'A': [1,0,0,0,0,0], 'B': [1,1,0,0,0,0], 'C': [1,0,0,1,0,0], 'D': [1,0,0,1,1,0],
+        'E': [1,0,0,0,1,0], 'F': [1,1,0,1,0,0], 'G': [1,1,0,1,1,0], 'H': [1,1,0,0,1,0],
+        'I': [0,1,0,1,0,0], 'J': [0,1,0,1,1,0], 'K': [1,0,1,0,0,0], 'L': [1,1,1,0,0,0],
+        'M': [1,0,1,1,0,0], 'N': [1,0,1,1,1,0], 'O': [1,0,1,0,1,0], 'P': [1,1,1,1,0,0],
+        'Q': [1,1,1,1,1,0], 'R': [1,1,1,0,1,0], 'S': [0,1,1,1,0,0], 'T': [0,1,1,1,1,0],
+        'U': [1,0,1,0,0,1], 'V': [1,1,1,0,0,1], 'W': [0,1,0,1,1,1], 'X': [1,0,1,1,0,1],
+        'Y': [1,0,1,1,1,1], 'Z': [1,0,1,0,1,1],
+        '1': [1,0,0,0,0,0], '2': [1,1,0,0,0,0], '3': [1,0,0,1,0,0], '4': [1,0,0,1,1,0],
+        '5': [1,0,0,0,1,0], '6': [1,1,0,1,0,0], '7': [1,1,0,1,1,0], '8': [1,1,0,0,1,0],
+        '9': [0,1,0,1,0,0], '0': [0,1,0,1,1,0], ' ': [0,0,0,0,0,0]
+      };
+
+      const BRAILLE_UNICODE_OFFSET = 0x2800;
+
+      const container = document.getElementById('viewport-container');
+      const canvas = document.getElementById('canvas3d');
+      const inputText = document.getElementById('input-text');
+      const inputHeight = document.getElementById('input-height');
+      const labelBraillePreview = document.getElementById('label-braille-preview');
+      const labelHeight = document.getElementById('label-height');
+      const gridBoard = document.getElementById('grid-board');
+      const metricDim = document.getElementById('metric-dim');
+      const metricWeight = document.getElementById('metric-weight');
+      const metricCost = document.getElementById('metric-cost');
+      const btnExport = document.getElementById('btn-export');
+      const presetButtons = document.querySelectorAll('.btn-preset');
+
+      // Grid state 8x8 (0: Kosong, 1: Dinding, 2: Start Point)
+      const gridData = Array(64).fill(0);
+
+      // Inisialisasi Denah Default (Contoh: Koridor & Kamar)
+      [0,1,2,3,4,5,6,7, 8,15, 16,23, 24,31, 32,39, 40,47, 48,55, 56,57,58,61,62,63].forEach(idx => gridData[idx] = 1);
+      gridData[27] = 1; gridData[28] = 1; gridData[35] = 1; gridData[36] = 1; // Meja/Hambatan tengah
+      gridData[59] = 2; // Titik Start
+
+      // Render Antarmuka Grid Editor
+      for (let i = 0; i < 64; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'grid-cell';
+        if (gridData[i] === 1) cell.classList.add('active-wall');
+        if (gridData[i] === 2) cell.classList.add('active-start');
+
+        cell.addEventListener('click', () => {
+          if (gridData[i] === 0) {
+            gridData[i] = 1;
+            cell.className = 'grid-cell active-wall';
+          } else if (gridData[i] === 1) {
+            gridData[i] = 2;
+            cell.className = 'grid-cell active-start';
+          } else {
+            gridData[i] = 0;
+            cell.className = 'grid-cell';
+          }
+          updateTactileModel();
+        });
+        gridBoard.appendChild(cell);
+      }
+
+      // Three.js Scene Setup
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+      camera.position.set(0, 140, 180);
+
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.target.set(0, 0, 0);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+      dirLight.position.set(60, 160, 80);
+      scene.add(dirLight);
+
+      const fillLight = new THREE.DirectionalLight(0x38bdf8, 0.35);
+      fillLight.position.set(-80, -60, -60);
+      scene.add(fillLight);
+
+      const gridHelper = new THREE.GridHelper(300, 30, 0x1e293b, 0x111c38);
+      gridHelper.position.y = -0.5;
+      scene.add(gridHelper);
+
+      // Material Taktil (Kontras Tinggi: Dasar Biru/Hitam, Elemen Taktil Kuning)
+      const baseMaterial = new THREE.MeshStandardMaterial({
+        color: 0x131d38,
+        roughness: 0.6,
+        metalness: 0.1
+      });
+
+      const tactileMaterial = new THREE.MeshStandardMaterial({
+        color: 0xfacc15,
+        roughness: 0.35,
+        metalness: 0.15
+      });
+
+      const startPinMaterial = new THREE.MeshStandardMaterial({
+        color: 0xef4444,
+        roughness: 0.35,
+        metalness: 0.2
+      });
+
+      let plaqueGroup = new THREE.Group();
+      scene.add(plaqueGroup);
+
+      function textToUnicodeBraille(text) {
+        return text.toUpperCase().split('').map(ch => {
+          const matrix = BRAILLE_MAP[ch] || BRAILLE_MAP[' '];
+          let byte = 0;
+          for (let i = 0; i < 6; i++) {
+            if (matrix[i]) byte |= (1 << i);
+          }
+          return String.fromCharCode(BRAILLE_UNICODE_OFFSET + byte);
+        }).join('');
+      }
+
+      function updateTactileModel() {
+        const text = (inputText.value || "TOILET").toUpperCase();
+        const reliefH = parseFloat(inputHeight.value) || 1.2;
+
+        labelHeight.textContent = `${reliefH.toFixed(1)} mm`;
+        labelBraillePreview.textContent = textToUnicodeBraille(text);
+
+        // Bersihkan mesh lama
+        while (plaqueGroup.children.length > 0) {
+          const obj = plaqueGroup.children[0];
+          if (obj.geometry) obj.geometry.dispose();
+          plaqueGroup.remove(obj);
+        }
+
+        // Dimensi Baku Plakat
+        const plateW = 110;
+        const plateD = 135;
+        const plateBaseH = 2.4; // Tebal pelat dasar
+
+        // 1. Pelat Dasar (Rounded Box)
+        const baseShape = new THREE.Shape();
+        const r = 6;
+        const w2 = plateW / 2;
+        const d2 = plateD / 2;
+        baseShape.moveTo(-w2 + r, -d2);
+        baseShape.lineTo(w2 - r, -d2);
+        baseShape.quadraticCurveTo(w2, -d2, w2, -d2 + r);
+        baseShape.lineTo(w2, d2 - r);
+        baseShape.quadraticCurveTo(w2, d2, w2 - r, d2);
+        baseShape.lineTo(-w2 + r, d2);
+        baseShape.quadraticCurveTo(-w2, d2, -w2, d2 - r);
+        baseShape.lineTo(-w2, -d2 + r);
+        baseShape.quadraticCurveTo(-w2, -d2, -w2 + r, -d2);
+
+        const baseGeom = new THREE.ExtrudeGeometry(baseShape, {
+          depth: plateBaseH,
+          bevelEnabled: true,
+          bevelThickness: 0.6,
+          bevelSize: 0.6,
+          bevelSegments: 2
+        });
+        const baseMesh = new THREE.Mesh(baseGeom, baseMaterial);
+        baseMesh.rotation.x = -Math.PI / 2;
+        baseMesh.position.y = 0;
+        plaqueGroup.add(baseMesh);
+
+        // 2. Garis Pembatas Frame Denah
+        const mapAreaW = 76;
+        const mapAreaD = 76;
+        const mapCenterZ = -16;
+
+        // 3. Grid Denah Taktil (8x8)
+        const cellSize = mapAreaW / 8;
+        const wallH = reliefH + 0.4;
+        const wallGeom = new THREE.BoxGeometry(cellSize * 0.95, wallH, cellSize * 0.95);
+        const pinGeom = new THREE.CylinderGeometry(cellSize * 0.4, 0.5, wallH + 1.2, 16);
+
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            const idx = r * 8 + c;
+            const state = gridData[idx];
+            if (state === 0) continue;
+
+            const posX = -mapAreaW / 2 + c * cellSize + cellSize / 2;
+            const posZ = mapCenterZ - mapAreaD / 2 + r * cellSize + cellSize / 2;
+
+            if (state === 1) {
+              const wallMesh = new THREE.Mesh(wallGeom, tactileMaterial);
+              wallMesh.position.set(posX, plateBaseH + wallH / 2, posZ);
+              plaqueGroup.add(wallMesh);
+            } else if (state === 2) {
+              const pinMesh = new THREE.Mesh(pinGeom, startPinMaterial);
+              pinMesh.position.set(posX, plateBaseH + (wallH + 1.2) / 2, posZ);
+              plaqueGroup.add(pinMesh);
+            }
+          }
+        }
+
+        // 4. Huruf Braille Timbul di Bagian Bawah
+        const dotRadius = 0.85;
+        const dotH = reliefH;
+        const dotGeom = new THREE.SphereGeometry(dotRadius, 12, 10);
+        dotGeom.scale(1, dotH / dotRadius, 1);
+
+        const dotSpacingX = 2.4;
+        const dotSpacingY = 2.4;
+        const charSpacingX = 6.2;
+        const totalChars = Math.min(14, text.length);
+        const startBrailleX = -((totalChars - 1) * charSpacingX) / 2;
+        const brailleZ = 42;
+
+        for (let i = 0; i < totalChars; i++) {
+          const ch = text[i];
+          const matrix = BRAILLE_MAP[ch] || BRAILLE_MAP[' '];
+          const charOriginX = startBrailleX + i * charSpacingX;
+
+          // Koordinat 6 titik Braille (Kolom 1: dot 0,1,2 | Kolom 2: dot 3,4,5)
+          const dotOffsets = [
+            [-dotSpacingX / 2, -dotSpacingY], // dot 1
+            [-dotSpacingX / 2, 0],            // dot 2
+            [-dotSpacingX / 2, dotSpacingY],  // dot 3
+            [dotSpacingX / 2, -dotSpacingY],  // dot 4
+            [dotSpacingX / 2, 0],             // dot 5
+            [dotSpacingX / 2, dotSpacingY]    // dot 6
+          ];
+
+          for (let d = 0; d < 6; d++) {
+            if (matrix[d]) {
+              const dotMesh = new THREE.Mesh(dotGeom, tactileMaterial);
+              dotMesh.position.set(
+                charOriginX + dotOffsets[d][0],
+                plateBaseH,
+                brailleZ + dotOffsets[d][1]
+              );
+              plaqueGroup.add(dotMesh);
+            }
+          }
+        }
+
+        // Metrik
+        metricDim.textContent = `${plateW} x ${plateD} mm`;
+        const estWeight = Math.round((plateW * plateD * plateBaseH * 0.001 * 0.35 * 1.24) + 16);
+        metricWeight.textContent = `${estWeight} g`;
+        const estCost = Math.max(15000, Math.round(estWeight * 500 / 1000) * 1000);
+        metricCost.textContent = `Rp ${estCost.toLocaleString('id-ID')}`;
+      }
+
+      // Generator STL Gabungan Semua Mesh Anak
+      function exportCombinedBinarySTL(group, filename = 'tactile-map.stl') {
+        const geometries = [];
+
+        group.traverse((child) => {
+          if (child.isMesh && child.geometry) {
+            const cloneGeom = child.geometry.clone();
+            cloneGeom.applyMatrix4(child.matrixWorld);
+            geometries.push(cloneGeom.toNonIndexed());
+          }
+        });
+
+        if (geometries.length === 0) return;
+
+        let totalTriangles = 0;
+        geometries.forEach(g => {
+          totalTriangles += g.attributes.position.count / 3;
+        });
+
+        const buffer = new ArrayBuffer(84 + (totalTriangles * 50));
+        const view = new DataView(buffer);
+
+        const header = "Binary STL - TactileMap 3D Braille & Map Generator";
+        for (let i = 0; i < 80; i++) {
+          view.setUint8(i, i < header.length ? header.charCodeAt(i) : 0);
+        }
+        view.setUint32(80, totalTriangles, true);
+
+        let offset = 84;
+        const vA = new THREE.Vector3();
+        const vB = new THREE.Vector3();
+        const vC = new THREE.Vector3();
+        const cb = new THREE.Vector3();
+        const ab = new THREE.Vector3();
+
+        geometries.forEach(geom => {
+          const pos = geom.attributes.position;
+          const triCount = pos.count / 3;
+
+          for (let i = 0; i < triCount; i++) {
+            vA.fromBufferAttribute(pos, i * 3);
+            vB.fromBufferAttribute(pos, i * 3 + 1);
+            vC.fromBufferAttribute(pos, i * 3 + 2);
+
+            cb.subVectors(vC, vB);
+            ab.subVectors(vA, vB);
+            cb.cross(ab).normalize();
+
+            view.setFloat32(offset, cb.x, true); offset += 4;
+            view.setFloat32(offset, cb.y, true); offset += 4;
+            view.setFloat32(offset, cb.z, true); offset += 4;
+
+            view.setFloat32(offset, vA.x, true); offset += 4;
+            view.setFloat32(offset, vA.y, true); offset += 4;
+            view.setFloat32(offset, vA.z, true); offset += 4;
+
+            view.setFloat32(offset, vB.x, true); offset += 4;
+            view.setFloat32(offset, vB.y, true); offset += 4;
+            view.setFloat32(offset, vB.z, true); offset += 4;
+
+            view.setFloat32(offset, vC.x, true); offset += 4;
+            view.setFloat32(offset, vC.y, true); offset += 4;
+            view.setFloat32(offset, vC.z, true); offset += 4;
+
+            view.setUint16(offset, 0, true); offset += 2;
+          }
+        });
+
+        const blob = new Blob([buffer], { type: 'application/octet-stream' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }
+
+      // Event Listeners
+      inputText.addEventListener('input', updateTactileModel);
+      inputHeight.addEventListener('input', updateTactileModel);
+
+      presetButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          inputText.value = btn.dataset.text;
+          updateTactileModel();
+        });
+      });
+
+      btnExport.addEventListener('click', () => {
+        const label = (inputText.value || "peta").trim().toLowerCase().replace(/\s+/g, '-');
+        exportCombinedBinarySTL(plaqueGroup, `tactile-braille-${label}.stl`);
+      });
+
+      window.addEventListener('resize', () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+      });
+
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+
+      updateTactileModel();
+      animate();
+    })();
+  </script>
+</body>
+</html>
